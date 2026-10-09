@@ -1,0 +1,36 @@
+# jev_compact plugin defaults — a0 merges user/plugin config over these.
+
+# Master switch. When false, the MCP entry is unregistered (auto-manage
+# mode) and the API/tool refuse compaction.
+enabled: false
+
+# Register the bundled a0_jev_compact restore server into mcp_servers at
+# startup (and remove it when disabled/uninstalled). Set false to manage
+# the entry yourself via the MCP settings UI.
+auto_register_mcp: true
+
+# Scorer: "auto" uses Jev (TypeSafe) or OpenRouter Decisions when a key
+# resolves, else the offline heuristic. "heuristic" forces offline.
+# "jev" refuses to compact without a key (fail loud, not silently
+# degraded).
+scorer: auto
+
+# Secret NAMES resolved from env → usr/secrets.env → usr/.env (same store
+# §§secret() uses). Values never enter settings.json or the MCP entry.
+scorer_secret_typesafe: TYPESAFE_API_KEY
+scorer_secret_openrouter: OPENROUTER_API_KEY
+
+# Optional scorer model override (e.g. "typesafe/jev-1.13", or any
+# OpenRouter chat slug for generic JSON scoring).
+jev_model: ""
+
+# Post-compact retained-token target for the knapsack (highlight header
+# + kept spans + tail + tombstones). Clamped to [2000, 200000].
+budget_tokens: 24000
+
+# Trailing spans never scored out — the live edge of the conversation.
+tail_keep: 4
+
+# Refuse compaction below this history size (matches _chat_compaction's
+# MIN_COMPACTION_TOKENS contract).
+min_tokens: 1000
