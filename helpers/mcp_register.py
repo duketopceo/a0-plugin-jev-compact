@@ -24,11 +24,20 @@ def store_root() -> Path:
     Lives OUTSIDE the plugin dir: uninstall must not silently strand
     receipts a compacted context still references. Falls back to a
     repo-local dir when running outside an installed plugin tree."""
-    helpers_dir = Path(__file__).resolve().parent
-    plugin_dir = helpers_dir.parent
-    if plugin_dir.parent.name == "plugins" and plugin_dir.parent.parent.name == "usr":
-        return plugin_dir.parent.parent / "jev_compact_store"
-    return plugin_dir / ".jev_store"  # dev/test fallback
+    from .secrets_env import a0_root_from
+
+    root = a0_root_from(__file__)
+    if root is not None:
+        return root / "usr" / "jev_compact_store"
+    return Path(__file__).resolve().parent.parent / ".jev_store"  # dev
+
+
+def current_value() -> Any:
+    """The raw settings["mcp_servers"] value — single lazy host import
+    shared by register/unregister/status."""
+    from helpers import settings as host_settings
+
+    return host_settings.get_settings().get("mcp_servers", "")
 
 
 def server_path() -> str:
@@ -36,7 +45,7 @@ def server_path() -> str:
     return str(Path(__file__).resolve().parent.parent / "server" / SERVER_ENTRYPOINT)
 
 
-def build_entry(cfg=None) -> dict[str, Any]:
+def build_entry() -> dict[str, Any]:
     """The mcp_servers entry for our stdio server — non-secret config
     only. ``env`` carries the plugin's NON-SECRET config (a0's stdio spawn
     env is a safe-list + this dict — it's the only channel to the child).
@@ -53,33 +62,24 @@ def build_entry(cfg=None) -> dict[str, Any]:
     }
 
 
-def _unparseable(raw: Any) -> bool:
-    """Non-empty + non-dict-raw that fails json.loads. Distinguishes a
-    corrupt mcp_servers blob (refuse to write — a rebuild would silently
-    delete every other server) from absent/empty (safe to initialize)."""
-    if isinstance(raw, dict) or not raw:
-        return False
-    try:
-        json.loads(str(raw))
-        return False
-    except (json.JSONDecodeError, TypeError):
-        return True
+def _parse_config(raw: Any) -> dict[str, Any] | None:
+    """Parse + normalize the mcp_servers settings value ONCE.
 
-
-def _parse_config(raw: Any) -> dict[str, Any]:
-    """Best-effort parse of the mcp_servers settings value. Anything
-    malformed returns a fresh shape — a broken config must not wedge
-    plugin startup (a0 already surfaces the parse error separately).
-    Never mutates the caller's data — copies before writing. a0's own
-    apply endpoint also accepts ``mcpServers`` as a list of named server
-    dicts (MCPConfig.normalize_config) — keep that form's entries."""
+    Returns ``None`` for a non-empty value that fails to parse — a
+    corrupt blob must be left untouched (a rebuild would silently delete
+    every other server). Empty/missing returns a fresh normalized shape.
+    Never mutates the caller's data — copies before writing. a0's
+    normalize_config also accepts ``mcpServers`` as a list of named
+    server dicts and bare single-server objects — both are preserved."""
     if isinstance(raw, dict):
         data = dict(raw)  # copy — callers' dicts must not be mutated
+    elif not raw:
+        data = {}
     else:
         try:
-            data = json.loads(str(raw or ""))
+            data = json.loads(str(raw))
         except (json.JSONDecodeError, TypeError):
-            data = {}
+            return None  # corrupt — callers must not write
     if not isinstance(data, dict):
         data = {}
     servers = data.get("mcpServers")
@@ -101,21 +101,8 @@ def _parse_config(raw: Any) -> dict[str, Any]:
 
 
 def is_registered(raw: Any) -> bool:
-    return SERVER_NAME in _parse_config(raw)["mcpServers"]
-
-
-def merged_config(raw: Any, entry: dict[str, Any]) -> str:
-    """The mcp_servers JSON with *entry* installed under SERVER_NAME."""
     data = _parse_config(raw)
-    data["mcpServers"][SERVER_NAME] = entry
-    return json.dumps(data, indent=2)
-
-
-def without_server(raw: Any) -> str:
-    """The mcp_servers JSON with our entry removed (others preserved)."""
-    data = _parse_config(raw)
-    data["mcpServers"].pop(SERVER_NAME, None)
-    return json.dumps(data, indent=2)
+    return bool(data) and SERVER_NAME in data["mcpServers"]
 
 
 def _write(value: str, rollback_to: Any = None) -> None:
@@ -146,32 +133,32 @@ def _write(value: str, rollback_to: Any = None) -> None:
 _USER_KEYS = ("disabled", "disabled_tools", "init_timeout", "tool_timeout")
 
 
-def register(cfg=None) -> bool:
+def register() -> bool:
     """Write the entry into live settings if missing/stale. Lazy host
     import so this module never aborts a0's sweep."""
-    from helpers import settings as host_settings
-
-    current = host_settings.get_settings().get("mcp_servers", "")
-    if _unparseable(current):
+    current = current_value()
+    data = _parse_config(current)
+    if data is None:
         return False  # corrupt blob — don't "rebuild" over other servers
-    existing = _parse_config(current)["mcpServers"].get(SERVER_NAME)
-    entry = build_entry(cfg)
+    existing = data["mcpServers"].get(SERVER_NAME)
+    entry = build_entry()
     if isinstance(existing, dict):
         for key in _USER_KEYS:
             if key in existing:
                 entry[key] = existing[key]
     if existing == entry:
         return False
-    _write(merged_config(current, entry), rollback_to=current)
+    data["mcpServers"][SERVER_NAME] = entry
+    _write(json.dumps(data, indent=2), rollback_to=current)
     return True
 
 
 def unregister() -> bool:
     """Remove the entry from live settings (hooks.py uninstall)."""
-    from helpers import settings as host_settings
-
-    current = host_settings.get_settings().get("mcp_servers", "")
-    if _unparseable(current) or not is_registered(current):
+    current = current_value()
+    data = _parse_config(current)
+    if data is None or SERVER_NAME not in data["mcpServers"]:
         return False
-    _write(without_server(current), rollback_to=current)
+    data["mcpServers"].pop(SERVER_NAME)
+    _write(json.dumps(data, indent=2), rollback_to=current)
     return True

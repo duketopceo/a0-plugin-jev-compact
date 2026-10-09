@@ -2,25 +2,38 @@
 
 Source of truth: ``default_config.yaml`` (a0 merges user/plugin config
 on top). ``get_config`` is the single entry — it accepts the host's
-``get_plugin_config`` dict (or a raw override dict for tests) and
-normalizes every field with clamps. Env vars override the file for the
-secrets and scorer knobs only.
+``get_plugin_config`` dict (or a raw override dict for tests), applies
+``JEV_COMPACT_*``/``JEV_MODEL`` env overrides, then constructs the
+dataclass once (``__post_init__`` normalizes every field).
+
+Scorer keys are read under their conventional env/vault names —
+``TYPESAFE_API_KEY`` / ``OPENROUTER_API_KEY`` — resolved host-side by
+``secrets_env.resolve_token``; the names are not configurable.
 """
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 _PLUGIN = "jev_compact"
-
-ENV_PREFIX = "JEV_COMPACT_"
 
 MIN_BUDGET, MAX_BUDGET = 2_000, 200_000
 MIN_TAIL, MAX_TAIL = 0, 32
 MIN_MIN_TOKENS = 200
 SCORER_MODES = ("auto", "heuristic", "jev")
+
+# env var → config field (single normalize pass at construction)
+_ENV_MAP = {
+    "JEV_COMPACT_ENABLED": "enabled",
+    "JEV_COMPACT_AUTO_REGISTER_MCP": "auto_register_mcp",
+    "JEV_COMPACT_SCORER": "scorer",
+    "JEV_MODEL": "jev_model",
+    "JEV_COMPACT_BUDGET_TOKENS": "budget_tokens",
+    "JEV_COMPACT_TAIL_KEEP": "tail_keep",
+    "JEV_COMPACT_MIN_TOKENS": "min_tokens",
+}
 
 
 def _bool(v: Any) -> bool:
@@ -42,8 +55,6 @@ class JevCompactConfig:
     enabled: bool = False
     auto_register_mcp: bool = True
     scorer: str = "auto"               # auto | heuristic | jev
-    scorer_secret_typesafe: str = "TYPESAFE_API_KEY"
-    scorer_secret_openrouter: str = "OPENROUTER_API_KEY"
     jev_model: str = ""                # override scorer model slug
     budget_tokens: int = 24_000        # post-compact retained-token target
     tail_keep: int = 4                 # trailing spans never scored out
@@ -55,12 +66,6 @@ class JevCompactConfig:
         self.scorer = str(self.scorer).strip().lower()
         if self.scorer not in SCORER_MODES:
             self.scorer = "auto"
-        self.scorer_secret_typesafe = str(
-            self.scorer_secret_typesafe or "TYPESAFE_API_KEY"
-        ).strip().upper()
-        self.scorer_secret_openrouter = str(
-            self.scorer_secret_openrouter or "OPENROUTER_API_KEY"
-        ).strip().upper()
         self.jev_model = str(self.jev_model or "").strip()
         self.budget_tokens = _int(
             self.budget_tokens, MIN_BUDGET, MAX_BUDGET, 24_000
@@ -73,8 +78,8 @@ class JevCompactConfig:
 
 
 def get_config(raw: dict[str, Any] | None = None) -> JevCompactConfig:
-    """Resolve config: explicit dict → host get_plugin_config → env
-    overrides for the secret/scorer knobs."""
+    """Resolve config once: host get_plugin_config → env overrides →
+    validated dataclass."""
     if raw is None:
         raw = {}
         try:
@@ -83,20 +88,12 @@ def get_config(raw: dict[str, Any] | None = None) -> JevCompactConfig:
             raw = host_plugins.get_plugin_config(_PLUGIN) or {}
         except Exception:
             raw = {}
-    cfg = JevCompactConfig(**{k: v for k, v in raw.items()
-                             if k in JevCompactConfig.__dataclass_fields__})
-    env_map = {
-        "enabled": "JEV_COMPACT_ENABLED",
-        "scorer": "JEV_COMPACT_SCORER",
-        "jev_model": "JEV_MODEL",
-        "budget_tokens": "JEV_COMPACT_BUDGET_TOKENS",
-        "tail_keep": "JEV_COMPACT_TAIL_KEEP",
-        "min_tokens": "JEV_COMPACT_MIN_TOKENS",
-        "auto_register_mcp": "JEV_COMPACT_AUTO_REGISTER_MCP",
+    merged = {
+        k: v for k, v in raw.items()
+        if k in JevCompactConfig.__dataclass_fields__
     }
-    for attr, env_name in env_map.items():
+    for env_name, attr in _ENV_MAP.items():
         v = os.environ.get(env_name)
         if v is not None:
-            setattr(cfg, attr, v)
-    cfg.__post_init__()
-    return cfg
+            merged[attr] = v
+    return JevCompactConfig(**merged)

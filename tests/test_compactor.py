@@ -68,7 +68,7 @@ def test_compact_context_end_to_end(make_context, chat_events, tmp_path,
     ctx = make_context("ctx9", messages=chat_events)
     cfg = _cfg()
 
-    result = asyncio.run(compactor.compact_context(ctx, cfg))
+    result = compactor.compact_context(ctx, cfg)
 
     assert result["tombstoned"] >= 1  # padded fixture forces drops
     assert result["tokens_after"] < result["tokens_before"]
@@ -90,27 +90,27 @@ def test_compact_context_end_to_end(make_context, chat_events, tmp_path,
 def test_compact_refuses_empty(make_context):
     ctx = make_context(messages=[])
     with pytest.raises(compactor.CompactError):
-        asyncio.run(compactor.compact_context(ctx, _cfg()))
+        compactor.compact_context(ctx, _cfg())
 
 
 def test_compact_refuses_tiny(make_context):
     ctx = make_context(messages=[{"ai": False, "content": "hi"}])
     with pytest.raises(compactor.CompactError, match="not enough spans"):
-        asyncio.run(compactor.compact_context(ctx, _cfg()))
+        compactor.compact_context(ctx, _cfg())
 
 
 def test_jev_scorer_missing_key_fails_loud(make_context, chat_events):
     ctx = make_context(messages=chat_events)
     cfg = _cfg(scorer="jev")
     with pytest.raises(compactor.CompactError, match="scorer=jev"):
-        asyncio.run(compactor.compact_context(ctx, cfg))
+        compactor.compact_context(ctx, cfg)
 
 
 # --- deferred tool request ---------------------------------------------------
 
 
 def test_tool_queues_deferred_compact(make_context):
-    from usr.plugins.jev_compact.tools.compact_request import JevCompact
+    from usr.plugins.jev_compact.tools.jev_compact import JevCompact
 
     ctx = make_context()
     runtime._reset()
@@ -124,7 +124,7 @@ def test_tool_queues_deferred_compact(make_context):
 
 
 def test_tool_refuses_when_disabled(make_context):
-    from usr.plugins.jev_compact.tools.compact_request import JevCompact
+    from usr.plugins.jev_compact.tools.jev_compact import JevCompact
 
     ctx = make_context()
     runtime._reset()

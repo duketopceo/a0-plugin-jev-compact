@@ -3,7 +3,9 @@
 Mirrors _chat_compaction's api contract: ``context`` + ``action`` input,
 ``stats`` returns a preview dict, ``compact`` schedules the work on the
 context's own task thread (never inline — HTTP handlers run on a0's
-event loop and the surgery is heavy).
+event loop and the surgery is heavy). The min_tokens policy lives inside
+``compact_context`` so the API stats path and the deferred agent-tool
+path share it.
 """
 
 from __future__ import annotations
@@ -43,28 +45,11 @@ class Compact(ApiHandler):
                 )
             except Exception as exc:
                 return {"ok": False, "message": str(exc)}
-            if stats["token_count"] < cfg.min_tokens:
-                return {
-                    "ok": False,
-                    "message": (
-                        f"Not enough content to compact "
-                        f"(minimum {cfg.min_tokens:,} tokens)"
-                    ),
-                }
             return {"ok": True, "stats": stats}
 
         if action == "compact":
-            stats = await asyncio.to_thread(
-                compactor.context_stats, context, cfg
-            )
-            if stats["token_count"] < cfg.min_tokens:
-                return {
-                    "ok": False,
-                    "message": (
-                        f"Not enough content to compact "
-                        f"(minimum {cfg.min_tokens:,} tokens)"
-                    ),
-                }
+            # min_tokens/empty-history refusals surface from the task's
+            # error log entry — the same guard the deferred path uses.
             context.run_task(_compact_task, context, cfg)
             return {"ok": True, "message": "Span compaction started"}
 
@@ -74,26 +59,10 @@ class Compact(ApiHandler):
 async def _compact_task(context, cfg) -> None:
     from usr.plugins.jev_compact.helpers import compactor  # lazy host path
 
-    try:
-        result = await compactor.compact_context(context, cfg)
-        context.log.log(
-            type="response",
-            heading="Context span-compacted",
-            content=(
-                f"{result['tokens_before']}→{result['tokens_after']} tokens, "
-                f"{result['tombstoned']} tombstone(s). Full spans stored — "
-                f"restore via a0_jev_compact MCP tools."
-            ),
-            update_progress="none",
-        )
+    if await compactor.compact_and_report(context, cfg) is not None:
         try:
             from helpers.state_monitor_integration import mark_dirty_all
 
             mark_dirty_all(reason="plugins.jev_compact.compact")
         except Exception:
             pass
-    except Exception as exc:
-        log.exception("jev_compact: compaction failed")
-        context.log.log(
-            type="error", heading="Span Compaction Failed", content=str(exc)
-        )

@@ -20,7 +20,7 @@ stdio MCP server. Extracted under Khan#197 (Caravanserai milestone).
 - `helpers/config.py` / `runtime.py` — config + deferred-flag state
 - `server/restore_server.py` — FastMCP stdio restore tools
 - `api/compact.py`, `api/jev_status.py` — host endpoints
-- `tools/compact_request.py` — agent-facing deferred-compact tool
+- `tools/jev_compact.py` — agent-facing deferred-compact tool (a0 resolves tools by filename)
 - `extensions/python/startup_migration/_76_…` — configure + register
 - `extensions/python/message_loop_end/_75_…` — runs deferred compacts
 - `hooks.py` — pre_uninstall/pre_update unregister

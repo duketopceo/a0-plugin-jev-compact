@@ -120,13 +120,23 @@ class SpanStore:
         return json.loads(p.read_text()) if p.exists() else {}
 
 
-def latest_session(root: Path) -> str | None:
+def list_sessions(root: Path) -> list[str]:
+    """Session ids with a saved span set (plugin-added helper — keep in
+    sync when vendoring a newer engine)."""
     if not root.is_dir():
+        return []
+    return sorted(
+        d.name for d in root.iterdir() if (d / "spans.json").exists()
+    )
+
+
+def latest_session(root: Path) -> str | None:
+    ids = list_sessions(root)
+    if not ids:
         return None
-    dirs = [d for d in root.iterdir() if (d / "spans.json").exists()]
-    if not dirs:
-        return None
-    return max(dirs, key=lambda d: d.stat().st_mtime).name
+    return max(
+        ids, key=lambda n: (root / n).stat().st_mtime
+    )
 
 
 def _parse_range(rng: str) -> tuple[int | None, int | None]:

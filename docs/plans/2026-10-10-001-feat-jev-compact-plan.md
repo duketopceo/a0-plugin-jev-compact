@@ -39,7 +39,7 @@ usr/plugins/jev_compact/
 │   │                                   _chat_compaction's guard contract)
 │   └── jev_status.py                  token-free status
 ├── tools/
-│   └── compact_request.py             agent-facing tool — flags a deferred
+│   └── jev_compact.py                 agent-facing tool — flags a deferred
 │                                      compaction for loop-end (never compacts
 │                                      inside a live monologue)
 ├── extensions/python/

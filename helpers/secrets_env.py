@@ -41,6 +41,9 @@ def parse_env_file(text: str) -> dict[str, str]:
     return out
 
 
+_root_cache: Path | None | bool = False  # False = uncomputed
+
+
 def a0_root_from(path: str | Path) -> Path | None:
     """Locate the a0 root from a file inside ``usr/plugins/<p>/…``.
     Returns None when the layout doesn't match (e.g. repo checkout in
@@ -53,26 +56,33 @@ def a0_root_from(path: str | Path) -> Path | None:
     return None
 
 
+def _a0_root() -> Path | None:
+    """Self-located root, cached — the layout doesn't move at runtime."""
+    global _root_cache
+    if _root_cache is False:
+        _root_cache = a0_root_from(__file__)
+    return _root_cache or None
+
+
 _VAULT_FILES = ("secrets.env", ".env")  # a0's secret store covers both
 
 
-def read_vault(secret_name: str, *, a0_root: Path | None = None) -> str:
-    """Read *secret_name* from the a0 secret store under *a0_root* (or the
-    self-located root) — ``usr/secrets.env`` first, then ``usr/.env``
-    (helpers/secrets.py resolves §§secret() over the same files; secrets.env
-    wins, matching the store's precedence). Empty when absent — never raises."""
-    root = a0_root or a0_root_from(__file__)
+def load_vault(*, a0_root: Path | None = None) -> dict[str, str]:
+    """Parse both vault files ONCE into a merged name→value dict —
+    secrets.env wins over .env (the store's precedence). Empty on
+    absent/corrupt — never raises. One call should serve every secret a
+    request needs; don't re-read per name."""
+    root = a0_root or _a0_root()
     if root is None:
-        return ""
-    for name in _VAULT_FILES:
+        return {}
+    out: dict[str, str] = {}
+    for name in reversed(_VAULT_FILES):  # .env first, secrets.env over it
         try:
             text = (root / "usr" / name).read_text(encoding="utf-8-sig")
         except OSError:
             continue
-        value = parse_env_file(text).get(secret_name.upper())
-        if value:
-            return value
-    return ""
+        out.update(parse_env_file(text))
+    return out
 
 
 def resolve_token(
@@ -80,11 +90,15 @@ def resolve_token(
     *,
     a0_root: Path | None = None,
     environ: dict[str, str] | None = None,
+    vault: dict[str, str] | None = None,
 ) -> str:
-    """First hit wins: process env → vault file → empty. Secret names are
-    looked up uppercased — matching §§secret()/dotenv normalization."""
+    """First hit wins: process env → vault → empty. Secret names are
+    looked up uppercased — matching §§secret()/dotenv normalization.
+    Pass a pre-parsed ``vault`` dict when resolving several names."""
+    key = secret_name.upper()
     env = environ if environ is not None else os.environ
-    token = str(env.get(secret_name) or env.get(secret_name.upper()) or "").strip()
+    token = str(env.get(key) or "").strip()
     if token:
         return token
-    return read_vault(secret_name, a0_root=a0_root).strip()
+    v = vault if vault is not None else load_vault(a0_root=a0_root)
+    return str(v.get(key, "")).strip()

@@ -32,12 +32,9 @@ def configure(raw: dict[str, Any] | None = None) -> JevCompactConfig:
                     log.info("jev_compact: registered %s MCP server",
                              mcp_register.SERVER_NAME)
             else:
-                # disabled plugin must not leave a live tool surface
-                from helpers import settings as host_settings  # noqa: PLC0415
-
-                current = host_settings.get_settings().get("mcp_servers", "")
-                if mcp_register.is_registered(current):
-                    mcp_register.unregister()
+                # disabled plugin must not leave a live tool surface;
+                # unregister() itself is a no-op when absent/corrupt
+                if mcp_register.unregister():
                     log.info("jev_compact: unregistered %s (disabled)",
                              mcp_register.SERVER_NAME)
         except Exception:
@@ -68,22 +65,15 @@ def status() -> dict[str, Any]:
     cfg = get()
     registered = False
     try:
-        from helpers import settings as host_settings  # noqa: PLC0415
-
-        registered = mcp_register.is_registered(
-            host_settings.get_settings().get("mcp_servers", "")
-        )
+        registered = mcp_register.is_registered(mcp_register.current_value())
     except Exception:
         pass
     sessions = 0
     try:
-        root = mcp_register.store_root()
-        if root.is_dir():
-            sessions = sum(
-                1 for d in root.iterdir()
-                if d.is_dir() and (d / "spans.json").exists()
-            )
-    except OSError:
+        from .engine.jev_compact import store as engine_store
+
+        sessions = len(engine_store.list_sessions(mcp_register.store_root()))
+    except Exception:
         pass
     out: dict[str, Any] = {
         "enabled": cfg.enabled,

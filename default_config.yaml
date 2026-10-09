@@ -15,10 +15,10 @@ auto_register_mcp: true
 # degraded).
 scorer: auto
 
-# Secret NAMES resolved from env → usr/secrets.env → usr/.env (same store
-# §§secret() uses). Values never enter settings.json or the MCP entry.
-scorer_secret_typesafe: TYPESAFE_API_KEY
-scorer_secret_openrouter: OPENROUTER_API_KEY
+# Scorer keys resolve under fixed conventional names —
+# TYPESAFE_API_KEY / OPENROUTER_API_KEY — from env → usr/secrets.env →
+# usr/.env (the same vault store §§secret() uses). Values never enter
+# settings.json or the MCP entry.
 
 # Optional scorer model override (e.g. "typesafe/jev-1.13", or any
 # OpenRouter chat slug for generic JSON scoring).

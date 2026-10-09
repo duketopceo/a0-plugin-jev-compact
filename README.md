@@ -37,8 +37,8 @@ Upstream's *automatic* attention-window `compress()` (`message_loop_end/_10_orga
 | `enabled` | `false` | master switch; `false` unregisters the MCP entry |
 | `auto_register_mcp` | `true` | manage the `a0_jev_compact` entry automatically |
 | `scorer` | `auto` | `auto` (Jev/OpenRouter if keyed, else heuristic), `heuristic`, `jev` (fail loud without a key) |
-| `scorer_secret_typesafe` | `TYPESAFE_API_KEY` | secret NAME for TypeSafe |
-| `scorer_secret_openrouter` | `OPENROUTER_API_KEY` | secret NAME for OpenRouter Decisions |
+| — | `TYPESAFE_API_KEY` | fixed secret name for TypeSafe (env/vault) |
+| — | `OPENROUTER_API_KEY` | fixed secret name for OpenRouter Decisions |
 | `jev_model` | `""` | model override (`typesafe/jev-1.13`, `~typesafe/jev-latest`, …) |
 | `budget_tokens` | `24000` | retained-token target post-compact |
 | `tail_keep` | `4` | trailing spans never dropped |
