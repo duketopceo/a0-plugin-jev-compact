@@ -9,6 +9,7 @@ never compact mid-monologue safely, so it defers to the loop boundary.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from . import mcp_register
@@ -18,28 +19,32 @@ log = logging.getLogger(__name__)
 
 _cfg: JevCompactConfig | None = None
 _pending: set[str] = set()
+_configure_lock = threading.Lock()
 
 
 def configure(raw: dict[str, Any] | None = None) -> JevCompactConfig:
     """Resolve config + (un)register the MCP server. Called by the
-    startup extension (sync context) — never raises."""
+    startup extension (sync context) — never raises. Serialized: the
+    register/unregister decision depends on the _cfg being replaced,
+    so two concurrent configures must not interleave."""
     global _cfg
-    _cfg = get_config(raw)
-    if _cfg.auto_register_mcp:
-        try:
-            if _cfg.enabled:
-                if mcp_register.register():
-                    log.info("jev_compact: registered %s MCP server",
-                             mcp_register.SERVER_NAME)
-            else:
-                # disabled plugin must not leave a live tool surface;
-                # unregister() itself is a no-op when absent/corrupt
-                if mcp_register.unregister():
-                    log.info("jev_compact: unregistered %s (disabled)",
-                             mcp_register.SERVER_NAME)
-        except Exception:
-            log.exception("jev_compact: MCP registration failed")
-    return _cfg
+    with _configure_lock:
+        _cfg = get_config(raw)
+        if _cfg.auto_register_mcp:
+            try:
+                if _cfg.enabled:
+                    if mcp_register.register():
+                        log.info("jev_compact: registered %s MCP server",
+                                 mcp_register.SERVER_NAME)
+                else:
+                    # disabled plugin must not leave a live tool surface;
+                    # unregister() itself is a no-op when absent/corrupt
+                    if mcp_register.unregister():
+                        log.info("jev_compact: unregistered %s (disabled)",
+                                 mcp_register.SERVER_NAME)
+            except Exception:
+                log.exception("jev_compact: MCP registration failed")
+        return _cfg
 
 
 def get() -> JevCompactConfig:
