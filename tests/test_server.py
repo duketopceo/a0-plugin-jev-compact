@@ -101,3 +101,22 @@ def test_server_is_read_only():
     for banned in ("write_text", "os.remove", "os.unlink", "shutil.rmtree",
                    "open(", ".save("):
         assert banned not in src
+
+
+def test_a0_root_detects_symlink_install(tmp_path):
+    """usr/plugins/jev_compact -> repo checkout: __file__ keeps the
+    usr/plugins component; resolve() would follow the link OUT and miss
+    the a0 root entirely (store/vault silently fell back to repo-local
+    paths before the unresolved-first walk)."""
+    from usr.plugins.jev_compact.helpers import secrets_env
+
+    a0 = tmp_path / "a0"
+    (a0 / "usr" / "plugins").mkdir(parents=True)
+    repo = tmp_path / "a0-plugin-jev-compact"
+    (repo / "helpers").mkdir(parents=True)
+    (a0 / "usr" / "plugins" / "jev_compact").symlink_to(repo)
+
+    # path as Python imports it — THROUGH the symlink (unresolved)
+    imported = (a0 / "usr" / "plugins" / "jev_compact" / "helpers"
+                / "secrets_env.py")
+    assert secrets_env.a0_root_from(imported) == a0

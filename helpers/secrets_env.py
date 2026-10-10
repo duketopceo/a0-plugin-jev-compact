@@ -48,11 +48,17 @@ def a0_root_from(path: str | Path) -> Path | None:
     """Locate the a0 root from a file inside ``usr/plugins/<p>/…``.
     Returns None when the layout doesn't match (e.g. repo checkout in
     tests). Only ``usr/plugins`` counts — a bare ``usr/`` dir would match
-    the filesystem root."""
-    p = Path(path).resolve()
-    for parent in p.parents:
-        if (parent / "usr" / "plugins").is_dir():
-            return parent
+    the filesystem root.
+
+    Unresolved path is tried first: under a SYMLINK install
+    (usr/plugins/jev_compact -> repo checkout), ``__file__`` keeps the
+    usr/plugins component while ``.resolve()`` follows the link OUT of
+    the a0 tree — the resolved walk finds no usr/plugins and the store/
+    vault silently fall back to repo-local paths."""
+    for p in (Path(path).absolute(), Path(path).resolve()):
+        for parent in p.parents:
+            if (parent / "usr" / "plugins").is_dir():
+                return parent
     return None
 
 
