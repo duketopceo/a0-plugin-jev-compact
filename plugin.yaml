@@ -1,0 +1,15 @@
+name: jev_compact
+title: Jev Compact — Span-Scored Context Compaction
+description: >-
+  Span-level context compaction for a0 chats. Scores transcript spans
+  against a moving work-highlight (heuristic offline, or TypeSafe Jev /
+  OpenRouter Decisions when a key is configured), keeps high-value spans
+  verbatim, tombstones the rest — and every tombstone resolves back to
+  the verbatim span via the bundled a0_jev_compact MCP restore server.
+  Non-destructive: the full span store + a pre-compact backup persist
+  under usr/jev_compact_store/.
+version: 0.1.0
+author: duketopceo
+license: MIT
+homepage: https://github.com/duketopceo/a0-plugin-jev-compact
+min_a0_version: "0.9"

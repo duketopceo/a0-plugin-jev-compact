@@ -1,0 +1,33 @@
+# NOTICE
+
+This repository (**a0-plugin-jev-compact**, `duketopceo/a0-plugin-jev-compact`)
+is a plugin for [Agent Zero](https://github.com/agent0ai/agent-zero).
+
+## Upstream
+
+Agent Zero is licensed under the MIT License by **Agent Zero, s.r.o**
+(contact: pr@agent-zero.ai). No upstream source files are vendored here, but
+this plugin targets Agent Zero's plugin APIs and adapts patterns from it.
+The `mcp` Python SDK is an existing Agent Zero dependency — the bundled
+stdio server rides it rather than vendoring a protocol implementation.
+
+## Provenance
+
+- `helpers/engine/jev_compact/` vendors the `jev-compact` engine
+  (https://github.com/duketopceo/jev-compact), MIT-licensed work by
+  Luke Kimball / duketopceo — stdlib-only; sync upstream carefully.
+- `server/restore_server.py` ports `mcp/restore_server.py` from the same
+  repo to FastMCP (an existing Agent Zero dependency — no vendored
+  protocol implementation).
+- History-replacement contract mirrors `_chat_compaction`'s
+  `helpers/compactor.py` (backup → fresh History → provider-state clear
+  → persist) adapted for span-level compaction.
+- Secrets stay in a0's vault (`usr/secrets.env`, `§§secret()`): scorer
+  keys resolve host-side only — `mcp_servers` carries none.
+
+## This plugin
+
+Original work here is Copyright (c) 2026 Luke Kimball / duketopceo, released
+under the MIT terms in `LICENSE`.
+
+Preserve the upstream copyright notice and this NOTICE when redistributing.
