@@ -64,7 +64,7 @@ class ApiHandler:
 
     @classmethod
     def requires_csrf(cls) -> bool:
-        return True
+        return cls.requires_auth()  # host ties CSRF to auth, not a blanket True
 
     @classmethod
     def requires_api_key(cls) -> bool:
@@ -91,7 +91,8 @@ class _Response:
 
 
 class ToolResponse:
-    def __init__(self, message="", break_loop=False):
+    """helpers.tool.Response is a dataclass — break_loop is REQUIRED."""
+    def __init__(self, message, break_loop):
         self.message = message
         self.break_loop = break_loop
 
