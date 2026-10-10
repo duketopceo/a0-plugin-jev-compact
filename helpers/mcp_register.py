@@ -41,8 +41,11 @@ def current_value() -> Any:
 
 
 def server_path() -> str:
-    """Absolute path to the bundled server script."""
-    return str(Path(__file__).resolve().parent.parent / "server" / SERVER_ENTRYPOINT)
+    """Absolute path to the bundled server script. ``.absolute()`` NOT
+    ``.resolve()``: under a symlink install the spawned process must see
+    the usr/plugins path in its own ``__file__`` or ``secrets_env``/
+    store_root() can't walk up to the a0 root."""
+    return str(Path(__file__).absolute().parent.parent / "server" / SERVER_ENTRYPOINT)
 
 
 def build_entry() -> dict[str, Any]:
