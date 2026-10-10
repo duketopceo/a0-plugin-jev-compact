@@ -186,6 +186,7 @@ def _backup(context: Any) -> "Path":
     path.write_text(
         export_json_chat(context) or "{}", encoding="utf-8", errors="replace"
     )
+    path.chmod(0o600)  # transcript data — same guarantee as the span store
     return path
 
 
