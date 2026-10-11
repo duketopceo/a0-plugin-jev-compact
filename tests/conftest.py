@@ -272,9 +272,97 @@ class Agent:
     DATA_NAME_SUBORDINATE = "subordinate"
 
 
+# --- hermes stubs (dual-harness adapter) --------------------------------------
+# Mirror agent/context_engine.py's ContextEngine contract: token-state class
+# attrs the host reads directly, lifecycle + tool defaults, clone_for_agent.
+
+class _ContextEngine:
+    last_prompt_tokens: int = 0
+    last_completion_tokens: int = 0
+    last_total_tokens: int = 0
+    threshold_tokens: int = 0
+    context_length: int = 0
+    compression_count: int = 0
+    threshold_percent: float = 0.75
+    protect_first_n: int = 3
+    protect_last_n: int = 6
+    emit_automatic_compaction_status: bool = True
+
+    @property
+    def name(self):
+        return ""
+
+    def update_from_response(self, usage):
+        pass
+
+    def should_compress(self, prompt_tokens=None):
+        return False
+
+    def should_compress_preflight(self, messages):
+        return False
+
+    def should_compress_info(self, prompt_tokens=None):
+        return self.should_compress(prompt_tokens), None
+
+    def has_content_to_compress(self, messages):
+        return True
+
+    def compress(self, messages, current_tokens=None, focus_topic=None,
+                 force=False, memory_context=""):
+        return list(messages)
+
+    def on_session_start(self, session_id, **kwargs):
+        pass
+
+    def on_session_end(self, session_id, messages):
+        pass
+
+    def on_session_reset(self):
+        self.last_prompt_tokens = 0
+        self.last_completion_tokens = 0
+        self.last_total_tokens = 0
+        self.compression_count = 0
+
+    def get_tool_schemas(self):
+        return []
+
+    def handle_tool_call(self, name, args, **kwargs):
+        import json as _json
+
+        return _json.dumps({"error": f"Unknown context engine tool: {name}"})
+
+    def get_status(self):
+        return {
+            "last_prompt_tokens": max(self.last_prompt_tokens, 0),
+            "threshold_tokens": self.threshold_tokens,
+            "context_length": self.context_length,
+            "usage_percent": (
+                min(100, self.last_prompt_tokens / self.context_length * 100)
+                if self.context_length else 0
+            ),
+            "compression_count": self.compression_count,
+        }
+
+    def clone_for_agent(self):
+        import copy
+
+        return copy.deepcopy(self)
+
+    def update_model(self, model, context_length, base_url="", api_key="",
+                     provider="", api_mode=""):
+        """Simplified real-ABC semantics: percent x window → threshold."""
+        self.context_length = context_length
+        self.threshold_tokens = int(context_length * self.threshold_percent)
+
+
+_ce_mod = types.ModuleType("agent.context_engine")
+_ce_mod.ContextEngine = _ContextEngine
+
+
 _agent_mod = types.ModuleType("agent")
 _agent_mod.AgentContext = AgentContext
 _agent_mod.Agent = Agent
+_agent_mod.context_engine = _ce_mod
 
 
 # --- assemble helpers.* package ----------------------------------------------
@@ -310,6 +398,7 @@ sys.modules["helpers.persist_chat"] = _persist_mod
 sys.modules["helpers.state_monitor_integration"] = _state_mod
 sys.modules["helpers.tool"] = _tool_mod
 sys.modules["agent"] = _agent_mod
+sys.modules["agent.context_engine"] = _ce_mod
 
 
 # --- fixtures ----------------------------------------------------------------

@@ -13,3 +13,47 @@ author: duketopceo
 license: MIT
 homepage: https://github.com/duketopceo/a0-plugin-jev-compact
 min_a0_version: "0.9"
+
+# ── Hermes harness fields (a0 ignores unknown keys) ────────────────
+# kind: exclusive — Hermes's general plugin scan records but does not
+# import the plugin; activation is via `context.engine: jev_compact`
+# (context-engine dir discovery sniffs __init__.py for the
+# register_context_engine marker and capture-loads register(ctx)).
+manifest_version: 2
+kind: exclusive
+# Scorer keys stay secrets — Hermes resolves them via .env/secret scope,
+# never via these declared non-secret fields or MCP env.
+optional_env:
+  - TYPESAFE_API_KEY
+  - OPENROUTER_API_KEY
+# Engine-carried tools (jev_compact + get_span / list_tombstones /
+# get_highlight / list_sessions) surface via the ContextEngine's
+# get_tool_schemas once `context.engine` selects it — they are NOT
+# register()ed, so they are intentionally absent from provides_tools.
+# Hermes settings UI surface — mirrors default_config.yaml; the engine
+# reads plugins.entries.jev_compact.settings.* via ctx-equivalent config.
+config_schema:
+  enabled:
+    type: bool
+    default: false
+    description: Master switch — when false the engine reports no compression need.
+  scorer:
+    type: str
+    default: auto
+    description: "auto (key-resolved Jev/OpenRouter, else heuristic) | heuristic | jev"
+  jev_model:
+    type: str
+    default: ""
+    description: Optional scorer model override (e.g. typesafe/jev-1.13).
+  budget_tokens:
+    type: int
+    default: 24000
+    description: Post-compact retained-token target, clamped to [2000, 200000].
+  tail_keep:
+    type: int
+    default: 4
+    description: Trailing spans never scored out — the live edge.
+  min_tokens:
+    type: int
+    default: 1000
+    description: Refuse compaction below this history size.

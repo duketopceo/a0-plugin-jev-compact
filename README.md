@@ -65,7 +65,24 @@ The agent sees tombstone receipts inline and can pull any span back with `a0_jev
 - `mcp_servers` writes go through `set_settings_delta` only (never the wholesale `set_settings`), with a0's `[]`→value two-step + rollback; corrupt blobs refuse writes; user-edited `disabled`/`disabled_tools`/timeouts survive re-registration.
 - Scoring calls are the only network traffic (opt-in via keys); heuristic mode is fully offline.
 
-## Hermes / other harnesses
+## Hermes (dual-harness)
+
+The same repo installs into [Hermes](https://github.com/NousResearch/hermes-agent) as a **context engine** — union `plugin.yaml`, no fork:
+
+```
+cp -r <this-repo> ~/.hermes/plugins/jev_compact   # or symlink
+# config.yaml: context.engine: jev_compact
+#   plugins.entries.jev_compact.settings.enabled: true
+```
+
+- `register(ctx)` (root `__init__.py` → `hermes_adapter.py`) registers `JevContextEngine` — Hermes's `ContextEngine` ABC. `kind: exclusive` keeps the general plugin scan out of the way; the engine loads when `context.engine` selects it.
+- `compress()` **is** the sanctioned mutation point on Hermes — the a0 tool→loop-end deferral maps onto it directly. The `jev_compact` tool queues a request the engine's `should_compress` reports.
+- Restore surface is **engine-carried tools** (`get_span`/`list_tombstones`/`get_highlight`/`list_sessions`) — `mcp.json` doesn't exist for native plugins; the stdio server stays a0-only.
+- Store: `<HERMES_HOME>/plugin-data/jev_compact/jev_compact_store/<session_id>/` — same spans/highlight/backup files, same 0600.
+- Scorer keys resolve via Hermes `.env`/`secret_scope` under the same `TYPESAFE_API_KEY`/`OPENROUTER_API_KEY` names.
+- Config: `plugins.entries.jev_compact.settings.*` — same keys/defaults as `default_config.yaml` (`auto_register_mcp` is a0-only and unused).
+
+## Other MCP-capable harnesses
 
 The restore server is plain stdio MCP — register the same block anywhere:
 
