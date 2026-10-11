@@ -18,7 +18,10 @@ stdio MCP server. Extracted under Khan#197 (Caravanserai milestone).
 - `helpers/mcp_register.py` — `a0_jev_compact` entry registrar
 - `helpers/secrets_env.py` — env → vault secret resolution
 - `helpers/config.py` / `runtime.py` — config + deferred-flag state
-- `server/restore_server.py` — FastMCP stdio restore tools
+- `server/restore_server.py` — FastMCP stdio restore tools (a0 only)
+- `__init__.py` / `hermes_adapter.py` — Hermes entry: `register(ctx)` →
+  `JevContextEngine` (ContextEngine ABC; `kind: exclusive`, activated by
+  `context.engine: jev_compact`; tools ride `get_tool_schemas`)
 - `api/compact.py`, `api/jev_status.py` — host endpoints
 - `tools/jev_compact.py` — agent-facing deferred-compact tool (a0 resolves tools by filename)
 - `extensions/python/startup_migration/_76_…` — configure + register
@@ -45,6 +48,11 @@ stdio MCP server. Extracted under Khan#197 (Caravanserai milestone).
   `message_loop_end` is async — checked in `test_consistency.py`.
 - Host-side modules import `usr.plugins.jev_compact.*` lazily inside
   functions/extensions (imports must never abort a0's sweeps).
+- **Dual-harness**: `__init__.py` + `hermes_adapter.py` are Hermes-only —
+  a0 never imports them; their `agent.*`/`hermes_cli.*`/`plugins.*`
+  imports are legal there but must stay out of a0-facing modules.
+  Hermes-side state lands under `plugin_data_dir("jev_compact")`, never
+  `usr/` paths or a hardcoded `~/.hermes`.
 
 ## Tests
 
