@@ -1,8 +1,40 @@
-# a0-plugin-jev-compact
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/wordmark-dark.svg">
+    <img src="assets/brand/wordmark.svg" alt="a0-plugin-jev-compact" width="560">
+  </picture>
+</p>
 
-Span-scored context compaction for [Agent Zero](https://github.com/agent0ai/agent-zero) — keeps the spans that matter, tombstones the rest, and **every tombstone is restorable** to its verbatim transcript text via a bundled MCP server.
+Span-scored context compaction for [Agent Zero](https://github.com/agent0ai/agent-zero): keep the spans that matter, tombstone the rest, and restore any tombstone verbatim through a bundled MCP server.
 
-Powered by the [`jev-compact`](https://github.com/duketopceo/jev-compact) engine (vendored, stdlib-only).
+Status: v0.1.0, off by default (`enabled: false`), min a0 0.9. Tests: 43 passing. Engine: the vendored, stdlib-only [`jev-compact`](https://github.com/duketopceo/jev-compact). Roadmap: [ROADMAP.md](ROADMAP.md).
+
+<!-- TODO: screenshot of the settings panel from a running a0 -->
+There is no custom UI; a0 renders the settings panel from `default_config.yaml`.
+
+## Install
+
+Place this repository at `<a0>/usr/plugins/jev_compact/` (the folder name must match `name: jev_compact` in `plugin.yaml`), then restart a0. Requires Python 3 and no extra packages.
+
+## Quick start
+
+1. In the plugin settings set `enabled: true`. At startup the plugin registers the `a0_jev_compact` MCP server (unless `auto_register_mcp: false`).
+2. Optional: add `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` to env, `usr/secrets.env` or `usr/.env` for model scoring. Without a key the offline heuristic scorer is used.
+3. Compact a chat: `POST /api/plugins/jev_compact/compact` with `{"context": "<ctxid>", "action": "compact"}` (use `"stats"` to preview), or let the agent call the `jev_compact` tool.
+4. Restore with the MCP tools, for example `get_span("s4-s9")`.
+
+## How it works
+
+```mermaid
+flowchart LR
+  H[a0 history] --> S[spans + highlight]
+  S --> C[score + knapsack]
+  C --> K[kept spans + tombstone receipts]
+  C --> D[(usr/jev_compact_store)]
+  K --> N[history replaced]
+  D --> M[a0_jev_compact MCP: get_span]
+  M --> N
+```
 
 ## How it differs from stock `_chat_compaction`
 
@@ -95,3 +127,15 @@ The restore server is plain stdio MCP — register the same block anywhere:
 ## Development
 
 `python -m pytest tests/ -q` — standalone (conftest stubs `agent`, `helpers.*`; the vendored engine runs unstubbed). CI: same command on push/PR.
+
+## Status and roadmap
+
+See [ROADMAP.md](ROADMAP.md) and the research in [docs/research/2026-10-10-landscape.md](docs/research/2026-10-10-landscape.md). Design notes: [DESIGN.md](DESIGN.md). The logo is a proposal pending owner sign-off.
+
+## Contributing
+
+Open an issue or a pull request against `main`. Run `python -m pytest tests/ -q` first; see [AGENTS.md](AGENTS.md) for layout and invariants (non-destructive store, settings writes via `set_settings_delta` only, stdlib-only engine).
+
+## Licence
+
+MIT. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
