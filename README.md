@@ -7,7 +7,7 @@
 
 Span-scored context compaction for [Agent Zero](https://github.com/agent0ai/agent-zero): keep the spans that matter, tombstone the rest, and restore any tombstone verbatim through a bundled MCP server.
 
-Status: v0.1.0, off by default (`enabled: false`), min a0 0.9. Tests: 43 passing. Engine: the vendored, stdlib-only [`jev-compact`](https://github.com/duketopceo/jev-compact). Roadmap: [ROADMAP.md](ROADMAP.md).
+Status: v0.1.0, off by default (`enabled: false`), min a0 0.9. Tests: `tests/` (CI runs `pytest tests/`). Engine: the vendored, stdlib-only [`jev-compact`](https://github.com/duketopceo/jev-compact). Roadmap: [ROADMAP.md](ROADMAP.md).
 
 <!-- TODO: screenshot of the settings panel from a running a0 -->
 There is no custom UI; a0 renders the settings panel from `default_config.yaml`.
